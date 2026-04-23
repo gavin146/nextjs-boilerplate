@@ -13,7 +13,13 @@ export function MobileAppShell({
     <div className="min-h-dvh w-full bg-zinc-950 text-zinc-50">
       <div className="mx-auto min-h-dvh w-full max-w-[430px]">
         <div className="min-h-dvh w-full bg-zinc-950">
-          <div className="pb-[calc(88px+env(safe-area-inset-bottom))]">
+          <div
+            className={
+              bottomBar
+                ? "pb-[calc(88px+env(safe-area-inset-bottom))]"
+                : "pb-[env(safe-area-inset-bottom)]"
+            }
+          >
             {children}
           </div>
 

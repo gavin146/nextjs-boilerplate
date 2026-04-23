@@ -1,8 +1,7 @@
 import type { ReactNode } from "react";
-import { MobileAppShell } from "../_ui/MobileAppShell";
-import { BottomTabs } from "./tabs";
+import { AppShellWithTabs } from "./AppShellWithTabs";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
-  return <MobileAppShell bottomBar={<BottomTabs />}>{children}</MobileAppShell>;
+  return <AppShellWithTabs>{children}</AppShellWithTabs>;
 }
 

@@ -14,24 +14,17 @@ function clamp(n: number, min: number, max: number) {
 
 function VideoPlaceholder({ label }: { label: string }) {
   return (
-    <div className="relative h-full w-full overflow-hidden rounded-[28px] border border-white/10 bg-gradient-to-b from-white/10 to-black/40">
+    <div className="relative h-full w-full min-h-0 overflow-hidden bg-zinc-950">
       <div className="absolute inset-0">
-        <div className="h-full w-full bg-[radial-gradient(circle_at_30%_30%,rgba(56,189,248,0.22),transparent_55%),radial-gradient(circle_at_70%_20%,rgba(52,211,153,0.18),transparent_50%),radial-gradient(circle_at_50%_90%,rgba(255,255,255,0.08),transparent_55%)]" />
+        <div className="h-full w-full bg-[radial-gradient(circle_at_30%_30%,rgba(56,189,248,0.2),transparent_55%),radial-gradient(circle_at_70%_20%,rgba(52,211,153,0.16),transparent_50%),radial-gradient(circle_at_50%_90%,rgba(255,255,255,0.06),transparent_55%)]" />
       </div>
-      <div className="absolute inset-0 flex flex-col justify-between p-4">
-        <div className="flex items-center justify-between">
-          <div className="rounded-2xl bg-black/35 px-3 py-1 text-[12px] font-semibold text-sky-200">
-            DEMO VIDEO
-          </div>
-          <div className="rounded-2xl bg-black/35 px-3 py-1 text-[12px] font-semibold text-emerald-200">
-            GIF-style
-          </div>
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-1/3 max-h-40 bg-gradient-to-t from-black/50 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 p-4">
+        <div className="text-[16px] font-semibold leading-tight tracking-tight text-white/95">
+          {label}
         </div>
-        <div>
-          <div className="text-[18px] font-semibold tracking-tight">{label}</div>
-          <div className="mt-1 text-[13px] text-white/70">
-            Replace with real GIF/video asset later.
-          </div>
+        <div className="mt-1 text-[12px] text-white/55">
+          Video unavailable — add asset or check connection.
         </div>
       </div>
     </div>
@@ -105,11 +98,42 @@ function DemoExerciseMedia({
     return <VideoPlaceholder label={exercise.mediaLabel} />;
   }
 
+  const videoBase = "h-full w-full min-h-0 bg-zinc-950";
+
+  if (hideBottomLabel) {
+    return (
+      <div className="relative h-full w-full min-h-0 overflow-hidden bg-zinc-950">
+        <video
+          ref={videoRef}
+          className={`${videoBase} object-cover object-center`}
+          src={demo.src}
+          autoPlay
+          muted
+          playsInline
+          loop
+          disablePictureInPicture
+          preload="metadata"
+          tabIndex={-1}
+          onContextMenu={(e) => e.preventDefault()}
+          onError={() => {
+            setSourceIndex((idx) => {
+              const next = idx + 1;
+              if (next < sources.length) return next;
+              setFailed(true);
+              return idx;
+            });
+          }}
+        />
+        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-1/3 max-h-40 bg-gradient-to-t from-black/30 to-transparent" />
+      </div>
+    );
+  }
+
   return (
-    <div className="relative h-full w-full overflow-hidden rounded-[28px] border border-white/10 bg-black">
+    <div className="relative h-full w-full overflow-hidden rounded-2xl border border-white/10 bg-zinc-950">
       <video
         ref={videoRef}
-        className="h-full w-full object-contain bg-black"
+        className={`${videoBase} object-contain`}
         src={demo.src}
         autoPlay
         muted
@@ -128,28 +152,15 @@ function DemoExerciseMedia({
           });
         }}
       />
-
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/5 to-transparent" />
-
-      <div className="absolute left-2 right-2 top-2 flex items-center justify-between gap-2 sm:left-3 sm:right-3 sm:top-3">
-        <div className="rounded-xl bg-black/40 px-2 py-0.5 text-[11px] font-semibold text-sky-200/95 backdrop-blur sm:rounded-2xl sm:px-2.5 sm:py-1 sm:text-[12px]">
-          {demo.credit === "MoveKit" ? "MoveKit" : "Demo video"}
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-1/2 max-h-56 bg-gradient-to-t from-black/50 via-black/5 to-transparent" />
+      <div className="absolute bottom-3 left-3 right-3 sm:bottom-4 sm:left-4 sm:right-4">
+        <div className="text-[16px] font-semibold leading-tight tracking-tight sm:text-[18px]">
+          {exercise.name}
         </div>
-        <div className="rounded-xl bg-black/40 px-2 py-0.5 text-[11px] font-semibold text-emerald-200/95 backdrop-blur sm:rounded-2xl sm:px-2.5 sm:py-1 sm:text-[12px]">
-          Loop
+        <div className="mt-0.5 text-[11px] text-white/65 sm:mt-1 sm:text-[12px]">
+          {demo.label} · {demo.credit}
         </div>
       </div>
-
-      {!hideBottomLabel ? (
-        <div className="absolute bottom-3 left-3 right-3 sm:bottom-4 sm:left-4 sm:right-4">
-          <div className="text-[16px] font-semibold leading-tight tracking-tight sm:text-[18px]">
-            {exercise.name}
-          </div>
-          <div className="mt-0.5 text-[11px] text-white/65 sm:mt-1 sm:text-[12px]">
-            {demo.label} · {demo.credit}
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -219,7 +230,7 @@ export function ExerciseSessionClient({
     idx < total - 1 ? `/workout/${workout.id}/exercise/${idx + 1}` : null;
 
   return (
-    <div className="flex h-[calc(100svh-5.5rem-env(safe-area-inset-bottom,0px))] max-h-[calc(100svh-5.5rem-env(safe-area-inset-bottom,0px))] min-h-0 w-full flex-col overflow-hidden">
+    <div className="flex h-[calc(100svh-env(safe-area-inset-bottom,0px))] max-h-[calc(100svh-env(safe-area-inset-bottom,0px))] min-h-0 w-full flex-col overflow-hidden">
       <div className="shrink-0 px-3 pt-[max(8px,env(safe-area-inset-top,0px))] pb-2 sm:px-4">
         <div className="flex items-center justify-between gap-2 text-[12px] text-white/60">
           <Link
@@ -247,8 +258,8 @@ export function ExerciseSessionClient({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col px-3 sm:px-4">
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/5 sm:rounded-3xl">
-          <div className="min-h-0 w-full min-w-0 flex-1">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/5 sm:rounded-3xl">
+          <div className="min-h-0 min-w-0 flex-1 overflow-hidden bg-zinc-950">
             <DemoExerciseMedia exercise={exercise} hideBottomLabel />
           </div>
 
