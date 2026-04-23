@@ -11,13 +11,13 @@ export function MobileAppShell({
 }) {
   return (
     <div className="min-h-dvh w-full bg-zinc-950 text-zinc-50">
-      <div className="mx-auto min-h-dvh w-full max-w-[430px]">
-        <div className="min-h-dvh w-full bg-zinc-950">
+      <div className="mx-auto flex h-dvh min-h-0 w-full max-w-[430px] flex-col">
+        <div className="flex min-h-0 w-full flex-1 flex-col bg-zinc-950">
           <div
             className={
               bottomBar
-                ? "pb-[calc(88px+env(safe-area-inset-bottom))]"
-                : "pb-[env(safe-area-inset-bottom)]"
+                ? "flex min-h-0 flex-1 flex-col pb-[calc(88px+env(safe-area-inset-bottom))]"
+                : "flex min-h-0 flex-1 flex-col pb-[env(safe-area-inset-bottom)]"
             }
           >
             {children}

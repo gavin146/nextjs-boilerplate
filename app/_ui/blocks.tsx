@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { ChevronBackIcon } from "./icons";
 
@@ -8,12 +9,15 @@ export function TopBar({
   subtitle,
   backHref,
   right,
+  note,
 }: {
   title: string;
   subtitle?: string;
   /** When set, shows a tappable back control (e.g. workout detail). */
   backHref?: string;
-  right?: React.ReactNode;
+  right?: ReactNode;
+  /** Optional full-width line below the title row (cues, hints). */
+  note?: ReactNode;
 }) {
   return (
     <header className="sticky top-0 z-20 border-b border-white/5 bg-zinc-950/80 backdrop-blur-xl">
@@ -40,6 +44,11 @@ export function TopBar({
           </div>
           {right ? <div className="pt-1 shrink-0">{right}</div> : null}
         </div>
+        {note ? (
+          <div className="mt-2 text-[13px] leading-relaxed text-white/50">
+            {note}
+          </div>
+        ) : null}
       </div>
     </header>
   );

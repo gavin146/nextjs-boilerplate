@@ -30,6 +30,13 @@ body {
   height: 100%;
 }
 
+html {
+  /* Match app chrome to dark UI; helps scrollbars, form controls. */
+  color-scheme: dark;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 /* Nicer iOS-like scrolling + prevent accidental desktop-y overscroll glow */
 body {
   overscroll-behavior-y: none;
