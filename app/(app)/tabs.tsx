@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { APP_FOCUS_RING } from "../_ui/focusRing";
 import { DumbbellIcon, HomeIcon, SparkIcon } from "../_ui/icons";
 
 type TabKey = "today" | "workout" | "coach";
@@ -13,7 +14,7 @@ const tabs: Array<{
   icon: React.ReactNode;
 }> = [
   { key: "today", href: "/today", label: "Today", icon: <HomeIcon /> },
-  { key: "workout", href: "/workout", label: "Workout", icon: <DumbbellIcon /> },
+  { key: "workout", href: "/workout", label: "Train", icon: <DumbbellIcon /> },
   { key: "coach", href: "/coach", label: "Coach", icon: <SparkIcon /> },
 ];
 
@@ -22,7 +23,7 @@ export function BottomTabs() {
   const activeKey: TabKey =
     pathname?.startsWith("/coach")
       ? "coach"
-      : pathname?.startsWith("/today")
+      : pathname?.startsWith("/today") || pathname?.startsWith("/progress")
         ? "today"
         : "workout";
 
@@ -36,14 +37,14 @@ export function BottomTabs() {
               <Link
                 key={t.key}
                 href={t.href}
-                className={`flex w-full flex-col items-center justify-center gap-1 py-3 ${
-                  isActive ? "text-sky-300" : "text-white/70"
+                className={`flex w-full flex-col items-center justify-center gap-1 rounded-xl py-2.5 outline-none transition ${APP_FOCUS_RING} ${
+                  isActive ? "text-sky-300" : "text-white/72"
                 }`}
               >
-                <span className={isActive ? "opacity-100" : "opacity-80"}>
+                <span className={isActive ? "opacity-100" : "opacity-85"}>
                   {t.icon}
                 </span>
-                <span className="text-[11px] font-medium tracking-tight">
+                <span className="text-[12px] font-semibold tracking-tight">
                   {t.label}
                 </span>
               </Link>

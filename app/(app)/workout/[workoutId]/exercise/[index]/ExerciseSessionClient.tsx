@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ProgramExercise } from "../../../../../_lib/exerciseMedia";
 import { exerciseVideoSources } from "../../../../../_lib/exerciseMedia";
-import { demoWeekWorkouts } from "../../../../../_lib/programData";
+import { useAppProgram } from "../../../../providers/AppProgramProvider";
+import { APP_FOCUS_RING } from "../../../../../_ui/focusRing";
 import { TouchButton } from "../../../../../_ui/TouchButton";
 import { CheckIcon } from "../../../../../_ui/icons";
+import { ExerciseCoachPanel } from "./ExerciseCoachPanel";
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -52,6 +54,16 @@ function rpeSelectionHaptic() {
   }
 }
 
+function logSetHaptic() {
+  try {
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate(8);
+    }
+  } catch {
+    // ignore
+  }
+}
+
 function formatClock(totalSeconds: number) {
   const s = Math.max(0, Math.floor(totalSeconds));
   const m = Math.floor(s / 60);
@@ -74,6 +86,23 @@ function stripLoadUnit(s: string): string {
     .replace(/^(\d+(?:\.\d+)?)s$/i, "$1");
 }
 
+function buildSetsSummary(
+  exercise: ProgramExercise,
+  performed: Record<string, { reps: string; weight: string }>,
+): string {
+  const parts: string[] = [];
+  for (const s of exercise.sets) {
+    const k = `${exercise.id}:${s.id}`;
+    const row = performed[k];
+    const reps = (row?.reps ?? s.reps).trim();
+    const wRaw = (row?.weight ?? s.suggestedWeight).trim();
+    const wUnit = displayWeightUnit(s.suggestedWeight);
+    const wDisplay = stripLoadUnit(wRaw);
+    parts.push(`${reps}×${wDisplay}${wUnit}`);
+  }
+  return parts.join("; ") || exercise.name;
+}
+
 /** Single header: menu, exercise name (primary), index fraction, finish. */
 function ExerciseSessionHeader({
   backHref,
@@ -92,7 +121,7 @@ function ExerciseSessionHeader({
   navLocked?: boolean;
 }) {
   const actionShell =
-    "box-border size-9 min-h-9 min-w-9 max-h-9 max-w-9 shrink-0 select-none [touch-action:manipulation] transition active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-400/50";
+    `box-border size-9 min-h-9 min-w-9 max-h-9 max-w-9 shrink-0 select-none [touch-action:manipulation] transition active:scale-[0.99] ${APP_FOCUS_RING}`;
   return (
     <div className="flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden sm:gap-2.5">
       {navLocked ? (
@@ -135,7 +164,7 @@ function ExerciseSessionHeader({
       ) : (
         <Link
           href={finishHref}
-          className="box-border flex h-9 w-14 min-w-14 max-w-14 shrink-0 select-none items-center justify-center rounded-lg border border-sky-400/30 bg-sky-500/15 text-[10px] font-semibold leading-none tracking-tight text-sky-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] [touch-action:manipulation] transition hover:border-sky-400/50 hover:bg-sky-500/20 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-400/50 sm:text-[11px]"
+          className={`box-border flex h-9 w-14 min-w-14 max-w-14 shrink-0 select-none items-center justify-center rounded-lg border border-sky-400/30 bg-sky-500/15 text-[10px] font-semibold leading-none tracking-tight text-sky-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] [touch-action:manipulation] transition hover:border-sky-400/50 hover:bg-sky-500/20 active:scale-[0.99] sm:text-[11px] ${APP_FOCUS_RING}`}
           aria-label="Finish workout"
         >
           Finish
@@ -179,12 +208,7 @@ function DemoExerciseMedia({
         ? exercise.movekit.src
         : "";
 
-  const sources = useMemo(() => exerciseVideoSources(exercise), [
-    exercise.id,
-    exercise.name,
-    exercise.movekit?.kind,
-    movekitKey,
-  ]);
+  const sources = useMemo(() => exerciseVideoSources(exercise), [exercise]);
   const sourcesKey = useMemo(() => {
     return `${exercise.id}|${exercise.movekit?.kind ?? "none"}|${movekitKey}`;
   }, [exercise.id, exercise.movekit?.kind, movekitKey]);
@@ -193,8 +217,10 @@ function DemoExerciseMedia({
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- reset player when exercise/movekit identity changes */
     setSourceIndex(0);
     setFailed(false);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [sourcesKey]);
 
   const demo = sources[sourceIndex] ?? sources[0];
@@ -305,9 +331,18 @@ export function ExerciseSessionClient({
   workoutId: string;
   indexParam: string;
 }) {
+  const {
+    workouts,
+    markWorkoutCompleted,
+    profile,
+    state,
+    trainingMetricsPrompt,
+    recordCompletedExerciseWithRpe,
+    recordExerciseCoachQa,
+  } = useAppProgram();
   const workout = useMemo(
-    () => demoWeekWorkouts().find((w) => w.id === workoutId),
-    [workoutId],
+    () => workouts.find((w) => w.id === workoutId),
+    [workouts, workoutId],
   );
   const idx = clamp(Number(indexParam || 0), 0, 999);
 
@@ -324,7 +359,14 @@ export function ExerciseSessionClient({
   const [lastSetDifficulty, setLastSetDifficulty] = useState<number | null>(
     null,
   );
+  const [coachOpen, setCoachOpen] = useState(false);
   const router = useRouter();
+
+  const profileSummaryForCoach = useMemo(
+    () =>
+      `${profile.experience} · ${profile.daysPerWeek}x weekly · ${profile.equipmentNotes}. Goals: ${profile.goalsText.slice(0, 400)}`,
+    [profile],
+  );
 
   useEffect(() => {
     if (!exercise) return;
@@ -335,10 +377,12 @@ export function ExerciseSessionClient({
         weight: s.suggestedWeight,
       };
     }
+    /* eslint-disable react-hooks/set-state-in-effect -- sync form state when navigating exercises */
     setPerformed(next);
     setDoneSetIds({});
     setRestRemaining(null);
     setLastSetDifficulty(null);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [exercise, indexParam, workoutId]);
 
   useEffect(() => {
@@ -351,6 +395,7 @@ export function ExerciseSessionClient({
       return () => clearTimeout(t);
     }
     if (restRemaining === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear overlay when countdown hits zero
       setRestRemaining(null);
     }
   }, [restRemaining]);
@@ -363,8 +408,110 @@ export function ExerciseSessionClient({
   }, [doneSetIds, exercise]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clear RPE sheet when sets unfinished
     if (!allSetsDone) setLastSetDifficulty(null);
   }, [allSetsDone]);
+
+  const inRest = restRemaining != null && restRemaining > 0;
+  const showLastSetDifficulty =
+    allSetsDone && lastSetDifficulty === null && !inRest;
+
+  useEffect(() => {
+    if (showLastSetDifficulty) setCoachOpen(false);
+  }, [showLastSetDifficulty]);
+
+  const askCoachInline = useCallback(
+    async (question: string) => {
+      if (!workout || !exercise)
+        throw new Error("Exercise unavailable.");
+      const setsSummary = buildSetsSummary(exercise, performed);
+      const sessionContext = [
+        `Session: ${workout.title}`,
+        `Lift: ${exercise.name}`,
+        `Exercise ${idx + 1} of ${total}`,
+        exercise.cue.trim() ? `Cue: ${exercise.cue.trim()}` : null,
+        `Logged sets: ${setsSummary}`,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
+      const res = await fetch("/api/coach/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: question }],
+          profileSummary: profileSummaryForCoach,
+          coachFacts: state.coachMemory.facts,
+          sessionContext,
+          metricsSummary: trainingMetricsPrompt,
+        }),
+      });
+      const text = await res.text();
+      let data: { reply?: string; error?: string };
+      try {
+        data = JSON.parse(text) as { reply?: string; error?: string };
+      } catch {
+        throw new Error("Coach returned an invalid response.");
+      }
+      if (!res.ok) {
+        throw new Error(data.error ?? `Coach unavailable (${res.status}).`);
+      }
+      const reply =
+        data.reply ??
+        "Try one notch lighter and own each rep. Adjust load so form stays crisp.";
+      recordExerciseCoachQa({
+        workoutId: workout.id,
+        exerciseName: exercise.name,
+        question,
+        answer: reply,
+      });
+      return reply;
+    },
+    [
+      workout,
+      exercise,
+      performed,
+      idx,
+      total,
+      profileSummaryForCoach,
+      state.coachMemory.facts,
+      trainingMetricsPrompt,
+      recordExerciseCoachQa,
+    ],
+  );
+
+  const onLastSetRpe = useCallback(
+    (n: number) => {
+      if (!workout || !exercise) return;
+      rpeSelectionHaptic();
+      const setsSummary = buildSetsSummary(exercise, performed);
+      recordCompletedExerciseWithRpe({
+        workoutId: workout.id,
+        workoutTitle: workout.title,
+        exerciseId: exercise.id,
+        exerciseName: exercise.name,
+        setsSummary,
+        lastSetRpe: n,
+      });
+      setLastSetDifficulty(n);
+      if (idx < total - 1) {
+        router.push(`/workout/${workout.id}/exercise/${idx + 1}`);
+      } else {
+        markWorkoutCompleted(workout.id);
+        router.push(`/workout/${workout.id}`);
+      }
+    },
+    [
+      idx,
+      total,
+      router,
+      workout,
+      exercise,
+      performed,
+      recordCompletedExerciseWithRpe,
+      markWorkoutCompleted,
+    ],
+  );
 
   function setKey(setId: string) {
     if (!exercise) return "";
@@ -390,6 +537,7 @@ export function ExerciseSessionClient({
 
     const afterMark: Record<string, true> = { ...doneSetIds, [k]: true };
     setDoneSetIds(afterMark);
+    logSetHaptic();
     const firstIncomplete = exercise.sets.findIndex(
       (s2) => !afterMark[setKey(s2.id)],
     );
@@ -439,23 +587,7 @@ export function ExerciseSessionClient({
   const nextHref =
     idx < total - 1 ? `/workout/${workout.id}/exercise/${idx + 1}` : null;
 
-  const inRest = restRemaining != null && restRemaining > 0;
-  const showLastSetDifficulty =
-    allSetsDone && lastSetDifficulty === null && !inRest;
   const blockNextUntilLastSetRated = allSetsDone && lastSetDifficulty === null;
-
-  const onLastSetRpe = useCallback(
-    (n: number) => {
-      rpeSelectionHaptic();
-      setLastSetDifficulty(n);
-      if (idx < total - 1) {
-        router.push(`/workout/${workout.id}/exercise/${idx + 1}`);
-      } else {
-        router.push(`/workout/${workout.id}`);
-      }
-    },
-    [idx, total, router, workout.id],
-  );
 
   return (
     <>
@@ -494,6 +626,29 @@ export function ExerciseSessionClient({
                       inRest ? "pointer-events-none select-none" : ""
                     } ${inRest ? "opacity-45" : ""}`}
                   >
+                    {exercise.cue.trim() ? (
+                      <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3 sm:px-4">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-sky-300/90">
+                          Coach cue
+                        </div>
+                        <p className="mt-2 text-[13px] leading-relaxed text-white/85 sm:text-[14px]">
+                          {exercise.cue.trim()}
+                        </p>
+                        {exercise.mediaLabel.trim() ? (
+                          <p className="mt-2 text-[11px] text-white/40">
+                            {exercise.mediaLabel}
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    <button
+                      type="button"
+                      disabled={inRest || showLastSetDifficulty}
+                      onClick={() => setCoachOpen(true)}
+                      className={`mb-4 flex min-h-[52px] w-full items-center justify-center rounded-2xl border border-sky-400/35 bg-sky-500/12 px-4 py-3 text-center text-[15px] font-semibold leading-snug text-sky-100 [touch-action:manipulation] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition enabled:active:scale-[0.99] enabled:active:opacity-95 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-transparent disabled:text-white/28 ${APP_FOCUS_RING}`}
+                    >
+                      Ask coach about this lift
+                    </button>
                     <div className="text-[11px] font-bold uppercase tracking-wider text-white/55 sm:text-[12px]">
                       Sets
                     </div>
@@ -608,7 +763,7 @@ export function ExerciseSessionClient({
                                     : `Log set ${i + 1}`
                                 }
                                 onClick={() => onToggleSetDone(i)}
-                                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 [touch-action:manipulation] transition active:scale-95 ${
+                                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 [touch-action:manipulation] transition active:scale-95 ${APP_FOCUS_RING} ${
                                   rowDone
                                     ? "border-emerald-400/70 bg-emerald-400/25"
                                     : "border-white/20 bg-white/10 hover:border-sky-400/50 hover:bg-white/[0.12]"
@@ -638,7 +793,7 @@ export function ExerciseSessionClient({
                         <button
                           type="button"
                           onClick={unlogLastSet}
-                          className="min-h-12 w-full rounded-2xl border border-white/10 bg-zinc-900/50 py-3 text-center text-[15px] font-medium text-white/85 [touch-action:manipulation] active:scale-[0.99] sm:min-h-[3.25rem] sm:text-[16px]"
+                          className={`min-h-12 w-full rounded-2xl border border-white/10 bg-zinc-900/50 py-3 text-center text-[15px] font-medium text-white/85 [touch-action:manipulation] transition active:scale-[0.99] active:bg-white/[0.05] sm:min-h-[3.25rem] sm:text-[16px] ${APP_FOCUS_RING}`}
                         >
                           Unlog last set
                         </button>
@@ -755,6 +910,16 @@ export function ExerciseSessionClient({
     </div>
     </div>
 
+    <ExerciseCoachPanel
+      open={coachOpen}
+      onClose={() => setCoachOpen(false)}
+      disabled={inRest || showLastSetDifficulty}
+      exerciseTitle={exercise.name}
+      workoutTitle={workout.title}
+      subtitle={`Exercise ${idx + 1} of ${total} · answer appears below`}
+      onAsk={askCoachInline}
+    />
+
     {showLastSetDifficulty && (
       <div
         className="fixed inset-0 z-[100] flex h-dvh max-h-dvh min-h-0 w-full min-w-0 items-stretch justify-center overflow-hidden bg-black/20 backdrop-blur-[2px] [touch-action:manipulation] [-webkit-tap-highlight-color:transparent]"
@@ -804,7 +969,7 @@ export function ExerciseSessionClient({
                   type="button"
                   onClick={() => onLastSetRpe(step.value)}
                   aria-label={`RPE ${step.value}. ${step.line}`}
-                  className={`box-border flex h-full min-h-0 w-full min-w-0 select-none flex-col items-center justify-center gap-0.5 rounded-2xl border px-1 py-0.5 text-center shadow-[0_2px_12px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.06)] transition will-change-transform [touch-action:manipulation] active:scale-[0.97] active:opacity-95 sm:gap-1 sm:px-1.5 sm:py-1 ${rpeCellClass(
+                  className={`box-border flex h-full min-h-0 w-full min-w-0 select-none flex-col items-center justify-center gap-0.5 rounded-2xl border px-1 py-0.5 text-center shadow-[0_2px_12px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.06)] transition will-change-transform [touch-action:manipulation] active:scale-[0.97] active:opacity-95 sm:gap-1 sm:px-1.5 sm:py-1 ${APP_FOCUS_RING} ${rpeCellClass(
                     step.value,
                   )}`}
                 >

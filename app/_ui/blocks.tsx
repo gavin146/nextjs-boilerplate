@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { APP_FOCUS_RING } from "./focusRing";
 import { ChevronBackIcon } from "./icons";
 
 export function TopBar({
@@ -27,7 +28,7 @@ export function TopBar({
             {backHref ? (
               <Link
                 href={backHref}
-                className="-ml-1 mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-white/85 ring-1 ring-white/0 transition active:bg-white/10 active:ring-white/10"
+                className={`-ml-1 mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-white/85 transition active:bg-white/10 ${APP_FOCUS_RING}`}
                 aria-label="Back"
               >
                 <ChevronBackIcon className="opacity-90" />
@@ -73,7 +74,7 @@ export function Card({
 export function Meter({ value, tone = "green" }: { value: number; tone?: "green" | "blue" }) {
   const bar = tone === "blue" ? "bg-sky-400" : "bg-emerald-400";
   return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+    <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/[0.11]">
       <div
         className={`h-full rounded-full transition-[width] ${bar}`}
         style={{ width: `${value}%` }}

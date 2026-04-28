@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 import { Card, Meter, TopBar } from "../../_ui/blocks";
-import { demoWeekWorkouts } from "../../_lib/programData";
+import { APP_FOCUS_RING } from "../../_ui/focusRing";
 import { TouchButton } from "../../_ui/TouchButton";
 import { ChevronRightIcon, PlayIcon } from "../../_ui/icons";
+import { useAppProgram } from "../providers/AppProgramProvider";
 
 function statusPill(status: "up_next" | "scheduled" | "completed") {
   if (status === "up_next")
@@ -15,169 +17,134 @@ function statusPill(status: "up_next" | "scheduled" | "completed") {
 }
 
 export default function WorkoutPage() {
-  const all = demoWeekWorkouts();
-  const workouts = all.filter((w) => w.status !== "completed");
-  const upNext = all.find((w) => w.status === "up_next") ?? workouts[0];
-  const completed = all.filter((w) => w.status === "completed").length;
-  const weekProgressPct =
-    all.length > 0 ? Math.round((completed / all.length) * 100) : 0;
-  const remaining = workouts.length;
+  const { workouts, state } = useAppProgram();
+
+  const completedIds = useMemo(
+    () => new Set(state.completedWorkoutIds),
+    [state.completedWorkoutIds],
+  );
+
+  const { completedCount, upNext, weekProgressPct, pending } = useMemo(() => {
+    const completedCount = workouts.filter((w) =>
+      completedIds.has(w.id),
+    ).length;
+    const pending = workouts.filter((w) => !completedIds.has(w.id));
+    const upNext =
+      pending.find((w) => w.status === "up_next") ?? pending[0] ?? null;
+    const weekProgressPct =
+      workouts.length > 0
+        ? Math.round((completedCount / workouts.length) * 100)
+        : 0;
+    return { completedCount, pending, upNext, weekProgressPct };
+  }, [workouts, completedIds]);
 
   return (
-    <div className="min-h-dvh">
+    <div className="pb-6">
       <TopBar
-        title="Workout"
+        title="Train"
         subtitle={
-          remaining
-            ? `${remaining} left this week · ${completed} done`
+          pending.length
+            ? `${completedCount} of ${workouts.length} done`
             : "Week complete"
         }
       />
 
-      <div className="px-4 pt-4 space-y-4">
-        <Card className="p-4 border-white/5">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <div className="text-[12px] font-medium text-white/50">
-                Week progress
-              </div>
-              <div className="mt-1 text-[28px] font-semibold tabular-nums tracking-tight text-white">
-                {completed}
-                <span className="text-white/40">/{all.length}</span>
-              </div>
-            </div>
-            <div className="text-right text-[12px] text-white/50">
-              sessions
-            </div>
+      <div className="space-y-3 px-4 pt-3">
+        <Card className="p-4">
+          <div className="flex items-end justify-between gap-2">
+            <span className="text-[13px] text-white/50">Week</span>
+            <span className="text-[22px] font-semibold tabular-nums">
+              {completedCount}
+              <span className="text-white/35">/{workouts.length}</span>
+            </span>
           </div>
-          <div className="mt-3">
+          <div className="mt-2">
             <Meter value={weekProgressPct} />
           </div>
         </Card>
 
         {upNext ? (
-          <Card className="p-4 border border-emerald-400/20 bg-gradient-to-b from-emerald-400/[0.12] to-white/[0.04] shadow-[0_0_0_1px_rgba(52,211,153,0.12)]">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-[12px] font-semibold tracking-wide text-emerald-200/95">
-                  UP NEXT
-                </div>
-                <div className="mt-2 text-[20px] font-semibold leading-snug tracking-tight">
-                  {upNext.title}
-                </div>
-                <div className="mt-1.5 text-[13px] text-white/55">
-                  {upNext.dayLabel} · {upNext.estimatedMinutes} min ·{" "}
-                  {upNext.focus}
-                </div>
-              </div>
-              <div className="shrink-0 rounded-2xl bg-emerald-400/20 px-3 py-1.5 text-[12px] font-semibold text-emerald-100">
-                Ready
-              </div>
+          <Card className="border-emerald-400/25 bg-emerald-400/[0.06] p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-200/90">
+              Next session
             </div>
-
-            <div className="mt-4 space-y-3">
-              <Link href={`/workout/${upNext.id}`} className="block">
-                <TouchButton
-                  left={<PlayIcon className="text-zinc-950" />}
-                  right={<span className="text-[13px] opacity-70">Start</span>}
-                >
-                  Open workout
-                </TouchButton>
-              </Link>
-              <Link href={`/workout/${upNext.id}/exercise/0`} className="block">
-                <TouchButton variant="blue" size="md">
-                  Jump to first exercise
-                </TouchButton>
-              </Link>
+            <div className="mt-2 text-[19px] font-semibold leading-snug">
+              {upNext.title}
             </div>
+            <div className="mt-1 text-[13px] text-white/55">
+              {upNext.dayLabel} · {upNext.estimatedMinutes} min
+            </div>
+            <Link href={`/workout/${upNext.id}/exercise/0`} className="mt-4 block">
+              <TouchButton left={<PlayIcon className="text-zinc-950" />}>
+                Start session
+              </TouchButton>
+            </Link>
+            <Link
+              href={`/workout/${upNext.id}`}
+              className="mt-2 block text-center text-[13px] font-medium text-sky-300/90"
+            >
+              Preview exercises & swaps
+            </Link>
           </Card>
         ) : null}
 
-        <Card className="p-4">
-          <div className="text-[16px] font-semibold tracking-tight">Schedule</div>
-          <div className="mt-1.5 text-[13px] leading-relaxed text-white/55">
-            Tap a session for the full list. Training order follows your
-            program.
+        <div>
+          <div className="mb-2 px-0.5 text-[14px] font-semibold tracking-tight text-white/58">
+            Your week
           </div>
-
-          <div className="mt-4 space-y-2.5">
+          <div className="space-y-2">
             {workouts.length ? (
-              workouts.map((w) => (
-                <Link key={w.id} href={`/workout/${w.id}`} className="block">
-                  <div className="flex items-stretch gap-3 rounded-3xl border border-white/10 bg-white/[0.04] p-1.5 pl-1.5 transition active:scale-[0.99] active:bg-white/[0.07]">
-                    <div className="flex w-12 shrink-0 flex-col items-center justify-center rounded-2xl bg-zinc-900/80 py-2 text-[11px] font-bold tabular-nums text-white/70">
-                      {w.dayLabel}
-                    </div>
-                    <div className="flex min-w-0 flex-1 flex-col justify-center py-1 pr-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="text-[17px] font-semibold leading-tight tracking-tight">
-                            {w.title}
-                          </div>
-                          <div className="mt-0.5 text-[13px] text-white/50">
-                            {w.estimatedMinutes} min · {w.focus}
-                          </div>
+              workouts.map((w) => {
+                const done = completedIds.has(w.id);
+                return (
+                  <Link
+                    key={w.id}
+                    href={`/workout/${w.id}`}
+                    className={`block rounded-2xl ${APP_FOCUS_RING}`}
+                  >
+                    <div className="flex min-h-[72px] items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3 [touch-action:manipulation] transition active:bg-white/[0.07]">
+                      <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-zinc-900 text-[12px] font-bold text-white/75">
+                        {w.dayLabel}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[16px] font-semibold leading-tight tracking-tight">
+                          {w.title}
                         </div>
-                        <div className="flex shrink-0 items-center gap-1.5">
-                          <div
-                            className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${statusPill(
-                              w.status,
-                            )}`}
-                          >
-                            {w.status === "up_next"
-                              ? "Up next"
-                              : w.status === "scheduled"
-                                ? "Scheduled"
-                                : "Done"}
-                          </div>
-                          <ChevronRightIcon className="text-white/30" />
+                        <div className="mt-0.5 text-[13px] text-white/45">
+                          {w.estimatedMinutes} min
                         </div>
                       </div>
+                      <div
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${statusPill(
+                          done ? "completed" : w.status,
+                        )}`}
+                      >
+                        {done ? "Done" : "Open"}
+                      </div>
+                      <ChevronRightIcon className="h-5 w-5 shrink-0 text-white/25" />
                     </div>
-                  </div>
-                </Link>
-              ))
+                  </Link>
+                );
+              })
             ) : (
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <div className="text-[15px] font-semibold tracking-tight">
-                  No workouts left
-                </div>
-                <div className="mt-1 text-[13px] text-white/60">
-                  You’re done for the week. We’ll load next week’s plan soon.
-                </div>
-              </div>
+              <Card className="p-4">
+                <p className="text-[14px] text-white/65">
+                  No sessions yet. Tap Refresh my week on Today.
+                </p>
+              </Card>
             )}
           </div>
-        </Card>
+        </div>
 
-        <Card className="p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-[13px] text-white/60">AI coach</div>
-              <div className="mt-2 text-[15px] leading-6">
-                If sleep is low or soreness is high, I’ll lower intensity and
-                keep volume productive.
-              </div>
-            </div>
-            <div className="mt-1 rounded-2xl bg-sky-400/15 px-3 py-1 text-[12px] font-semibold text-sky-200">
-              Adaptive
-            </div>
-          </div>
-          <div className="mt-4">
-            <Link href="/coach" className="block">
-              <TouchButton
-                variant="blue"
-                left={<PlayIcon className="text-zinc-950" />}
-              >
-                Ask the coach
-              </TouchButton>
-            </Link>
-          </div>
-        </Card>
-
-        <div className="h-6" />
+        <p className="px-1 text-center text-[13px] leading-relaxed text-white/42">
+          Questions mid-set? Use Ask coach on the exercise screen. Between
+          sessions:{" "}
+          <Link href="/coach" className="font-medium text-sky-400/90">
+            Coach tab
+          </Link>
+          .
+        </p>
       </div>
     </div>
   );
 }
-

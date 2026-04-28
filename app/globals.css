@@ -37,7 +37,13 @@ html {
   text-size-adjust: 100%;
 }
 
-/* Nicer iOS-like scrolling + prevent accidental desktop-y overscroll glow */
+/* Horizontal rubber-band only; vertical bounce handled by main scroll regions */
 body {
-  overscroll-behavior-y: none;
+  overscroll-behavior-x: none;
+}
+
+/* Smooth momentum scrolling inside app panels */
+.app-scroll-touch {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
 }

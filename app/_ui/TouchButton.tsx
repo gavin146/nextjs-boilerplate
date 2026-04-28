@@ -1,6 +1,7 @@
 "use client";
 
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { APP_FOCUS_RING } from "./focusRing";
 
 export function TouchButton({
   variant = "primary",
@@ -16,8 +17,7 @@ export function TouchButton({
   left?: ReactNode;
   right?: ReactNode;
 }) {
-  const base =
-    "w-full select-none rounded-2xl font-semibold tracking-tight active:scale-[0.99] disabled:opacity-40 disabled:active:scale-100";
+  const base = `${APP_FOCUS_RING} w-full select-none rounded-2xl font-semibold tracking-tight active:scale-[0.99] disabled:opacity-40 disabled:active:scale-100`;
   const sizes = {
     lg: "h-14 px-5 text-[17px]",
     md: "h-11 px-4 text-[15px]",

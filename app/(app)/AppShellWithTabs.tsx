@@ -10,7 +10,6 @@ import { BottomTabs } from "./tabs";
  */
 function hideAppBottomTabsForPathname(pathname: string | null): boolean {
   if (!pathname) return false;
-  if (pathname === "/workout/active") return true;
   return /^\/workout\/[^/]+\/exercise\//.test(pathname);
 }
 
